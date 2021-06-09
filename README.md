@@ -5,7 +5,7 @@
 
 ## GO
 
-### 1.Tue Jun 08 2021 21:32:38
+### 1.Tue Jun 08 2021 21:32:38 初始化gorm
 
 **context**： *gin-vue-admin*
 
@@ -51,7 +51,7 @@ Process finished with exit code 1
 
 ```
 
-### 2.Tue Jun 08 2021 21:48:11
+### 2.Tue Jun 08 2021 21:48:11 mysql事物
 
 **context**：*gin-vue-admin*
 
@@ -97,7 +97,7 @@ func TestDefer(t *testing.T) {
 
 ```
 
-### 3.Tue Jun 08 2021 22:00:38
+### 3.Tue Jun 08 2021 22:00:38 join查询
 
 **context:** gorm
 
@@ -110,11 +110,98 @@ db.Table("go_service_info").Select("go_service_info.serviceId as service_id, go_
 
 ```
 
+### 4.Wed Jun 09 2021 14:38:03 读写🔒
+
+**目的**：某个操作被多个执行人调用，如果同时读取数据是没有问题的，但如果同时写数据就会有冲突
+
+**方法**一：手动控制每次开锁关锁
+
+```go
+type handler struct {
+	logger       log.Logger
+	who          string
+	jdAPI        *JDAPI
+	uploadClient *CookieUploadClient
+
+	uploadRateLimitMu  sync.RWMutex    // 读写锁
+	uploadRateLimitMap map[string]uploadRateLimit
+}
+//……//
+func (h *handler) rateLimit(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cookie := r.Header.Get("Cookie")
+		if len(cookie) > 0 {
+			h.uploadRateLimitMu.RLock()
+			rateLimit := h.uploadRateLimitMap[cookie]
+			h.uploadRateLimitMu.RUnlock()
+			if time.Now().Sub(rateLimit.LastUploadTime) < cookieUploadRateLimitDuration {
+				if _, err := fmt.Fprintf(w, autoRefreshHTML, "same cookie upload rate limit"); err != nil {
+					h.logger.Error(h.who, err, "fail to respond %s", r.RemoteAddr)
+				}
+				return
+			}
+		}
+		next.ServeHTTP(w, r)
+		if len(cookie) > 0 {
+			h.uploadRateLimitMu.Lock()     // 更改前把数据锁住，只能这这次操作更改
+			h.uploadRateLimitMap[cookie] = uploadRateLimit{LastUploadTime: time.Now()}
+			h.uploadRateLimitMu.Unlock()	// 更改后把数据解锁
+		}
+	})
+}
+//……//
+```
+
+**方法二**：*sync.Map* go的sync库封装了一个Map
+
+把它当作一个更高效的redis使用
+
+```
+// Map is like a Go map[interface{}]interface{} but is safe for concurrent use
+// by multiple goroutines without additional locking or coordination.
+// Loads, stores, and deletes run in amortized constant time.
+```
+
+```go
+type shopInfo struct {
+   logger       log.Logger
+   cookieClient *client.JDCookieClient
+
+   cachedMallID sync.Map
+}
+//……//
+func (s *shopInfo) getMallID(cookie *client.JDCookie) (string, error) {
+	_mallID, exists := s.cachedMallID.Load(cookie.ShopID)
+	if exists {
+		return _mallID.(string), nil
+	}
+	mallID, err := s.queryMallID(cookie)
+	if err != nil {
+		return "", err
+	}
+	_mallID, _ = s.cachedMallID.LoadOrStore(cookie.ShopID, mallID)
+	return _mallID.(string), nil
+}
+//……//
+```
+
+```go
+Methods:
+  Load(key interface{}) (value interface{}, ok bool)
+  Store(key interface{}, value interface{})
+  LoadOrStore(key interface{}, value interface{}) (actual interface{}, loaded bool)
+  LoadAndDelete(key interface{}) (value interface{}, loaded bool)
+  Delete(key interface{})
+  Range(f func(key interface{}, value interface{}) bool)
+  missLocked()
+  dirtyLocked()
+```
+
 
 
 ## JS
 
-### 1.Tue Jun 08 2021 22:00:38
+### 1.Tue Jun 08 2021 22:00:38 el-select
 
 描述：el-select 如果带有 filterable=true, 当选择之后，切换窗口然后回到原来的页面会自动聚焦到select，下拉列表自动打开 该行为不应该出现 因为已经选择过了 只是没有blur
 
@@ -149,11 +236,11 @@ Vue.directive('select-blur', {
 
 ## Dashboard
 
-### 1.Wed Jun 09 2021 09:40:15
+### 1.Wed Jun 09 2021 09:40:15 resp 403
 
-**context:**gin-vue-admin
+**context**:gin-vue-admin
 
-**description:**测试时 在本地启动后端 http://127.0.0.1:8888  前端调用api 正常使用；把后端部署到正式服务器上后 返回 403 
+**description**:测试时 在本地启动后端 http://127.0.0.1:8888  前端调用api 正常使用；把后端部署到正式服务器上后 返回 403 
 
-**cause:**需要在sif的前端设置上 新路由路径 /* 以及权限配置
+**cause**:需要在sif的前端设置上 新路由路径 /* 以及权限配置
 
