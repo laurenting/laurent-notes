@@ -7,11 +7,13 @@
 
 ### 1.Tue Jun 08 2021 21:32:38
 
-描述：所在项目 *gin-vue-admin* , 在service写好API函数后随即写了xx_test.go,执行测试函数的时候的报错
+**context**： *gin-vue-admin*
 
-原因：被调用的函数内有用到全局的 gorm，由于没有初始化所以找不到
+**description**： 在service写好API函数后随即写了xx_test.go,执行测试函数的时候的报错
 
-解决：在测试时做好初始化，后来发现既然是在写api就写完后用 *swagger-go* 直接调用接口测试
+**cause**：被调用的函数内有用到全局的 gorm，由于没有初始化所以找不到
+
+**solution**：在测试时做好初始化，后来发现既然是在写api就写完后用 *swagger-go* 直接调用接口测试
 
 ```go
 GOROOT=/usr/local/go #gosetup
@@ -51,7 +53,9 @@ Process finished with exit code 1
 
 ### 2.Tue Jun 08 2021 21:48:11
 
-描述：还是在 *gin-vue-admin* ，第一次接触到 *mysql* 事务(*transaction*)， 项目里用的 gorm ，使用手动流程，以防万一没有结束事物就使用 defer 来做最终的操作
+**context**：*gin-vue-admin*
+
+**description**：第一次接触到 *mysql* 事务(*transaction*)， 项目里用的 gorm ，使用手动流程，以防万一没有结束事物就使用 defer 来做最终的操作
 
 ```go
 package service
@@ -95,9 +99,11 @@ func TestDefer(t *testing.T) {
 
 ### 3.Tue Jun 08 2021 22:00:38
 
-描述：gorm join查询 默认为left join
+**context:** gorm
 
-按照需要更改即可
+**description:** join查询 默认为left join
+
+**solution:** 按照需要更改即可
 
 ```go
 db.Table("go_service_info").Select("go_service_info.serviceId as service_id, go_service_info.serviceName as service_name, go_system_info.systemId as system_id, go_system_info.systemName as system_name").Joins("left join go_system_info on go_service_info.systemId = go_system_info.systemId where go_service_info.serviceId <> ? and go_system_info.systemId = ?", "xxx", "xxx").Scan(&results)
@@ -140,4 +146,14 @@ Vue.directive('select-blur', {
   }
 })
 ```
+
+## Dashboard
+
+### 1.Wed Jun 09 2021 09:40:15
+
+**context:**gin-vue-admin
+
+**description:**测试时 在本地启动后端 http://127.0.0.1:8888  前端调用api 正常使用；把后端部署到正式服务器上后 返回 403 
+
+**cause:**需要在sif的前端设置上 新路由路径 /* 以及权限配置
 
