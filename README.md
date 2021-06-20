@@ -112,7 +112,7 @@ db.Table("go_service_info").Select("go_service_info.serviceId as service_id, go_
 
 ### 4.Wed Jun 09 2021 14:38:03 读写🔒
 
-**目的**：某个操作被多个执行人调用，如果同时读取数据是没有问题的，但如果同时写数据就会有冲突
+**tar**：某个操作被多个执行人调用，如果同时读取数据是没有问题的，但如果同时写数据就会有冲突
 
 **方法**一：手动控制每次开锁关锁
 
@@ -195,6 +195,50 @@ Methods:
   Range(f func(key interface{}, value interface{}) bool)
   missLocked()
   dirtyLocked()
+```
+
+### 4.构建map Sun Jun 20 2021 15:59:27
+
+**description:**  sync京东数据的时候，返回两条有用数据 1.value的数组 2.value的key以及对应数组index的对象
+
+**tar:** 不设置固定的scheme，在go中根据返回内容生成  [{key:value}] 的对象; 在es设置好mapping存入时会自动进行类型转换
+
+```go
+// model
+type SzWaiterResp struct {
+	Content struct {
+		Data      [][]json.RawMessage `json:"data"`
+		MetaIndex map[string]int      `json:"metaIndex"`
+	} `json:"content"`
+	Message string `json:"message"`
+	Status  string `json:"status"`
+}
+// 对query结果进行处理
+waiterResp := &SzWaiterResp{}
+	if err = jsoniter.Unmarshal(resp, waiterResp); err != nil {
+		return nil, err
+	}
+	if waiterResp.Message != "success" {
+		return nil, err
+	}
+	indexKey := make(map[int]string, 0)
+	for key, val := range waiterResp.Content.MetaIndex {
+		indexKey[val] = key
+	}
+	result = make([]map[string]json.RawMessage, 0)
+	for _, jsonArr := range waiterResp.Content.Data {
+		part := make(map[string]json.RawMessage, 0)
+		for index, ele := range jsonArr {
+			part[indexKey[index]] = ele
+		}
+		shopID, _ := jsoniter.Marshal(cookie.ShopID)
+		date, _ := jsoniter.Marshal(FormatTimeStamp(timestamp))
+		updateTimestamp, _ := jsoniter.Marshal(FormatTimeStamp(time.Now()))
+		part["shopID"] = shopID
+		part["timestamp"] = date
+		part["updateTimestamp"] = updateTimestamp
+		result = append(result, part)
+	}
 ```
 
 
